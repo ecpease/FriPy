@@ -14,30 +14,47 @@ startTime = datetime.now()
 def pull_nwis_data(parameter, site_number, start_date, end_date, site_name):
     nwis_url = f'https://nwis.waterdata.usgs.gov/nwis/uv?cb_{parameter}=on&format=rdb&site_no={site_number}&period=&begin_date={start_date}&end_date={end_date}'
     print(nwis_url)    
-    
-    # Find where in the file the data actually starts and skip rows
-    for sr in range(25, 35):
-        try:
-            df = pd.read_table(nwis_url, skiprows=sr)
-            if df.columns.values[0] == '5s':
-                break
-        except:
-            print('Dormammu I have come to bargain') # Dr. Strange reference anyone?
-            
-    # Rename the columns to something easier to read
-    columns = ['Name', 'Site', 'DateTime', 'Tz', f'{parameter}', 'qual_code']
-    print(columns)
-    
-    # Read the table, skipping the rows
-    df = pd.read_table(nwis_url, skiprows=sr+1, names=columns)
 
-    # Export to csv with the title you give 
-    df.to_csv(f"{site_name}"+'.csv')
+    url_file = urlopen(nwis_url).readlines()
+    file = [0]
+    i = 0
+    for line in url_file:
+        file.append(line.decode("utf-8"))
+        i+=1
+        if i > 50: break # assume data starts before line 50
+    skiprows = next(filter(lambda x: x[1].startswith('5s'), enumerate(file))) # find line that begins with 5s
+    names = file[skiprows[0]-1].split()
+    df = pd.read_table(nwis_url, skiprows = skiprows[0]+1, names=names)
+    param_col = [item for item in df.columns if (parameter in item ) & ('cd' not in item)][0]
+    df = df[['DateTime', parameter]]
     df['DateTime'] = pd.to_datetime(df['DateTime'])
     return df
 
+
+    #
+    # # Find where in the file the data actually starts and skip rows
+    # for sr in range(25, 35):
+    #     try:
+    #         df = pd.read_table(nwis_url, skiprows=sr)
+    #         if df.columns.values[0] == '5s':
+    #             break
+    #     except:
+    #         print('Dormammu I have come to bargain') # Dr. Strange reference anyone?
+    #
+    # # Rename the columns to something easier to read
+    # columns = ['Name', 'Site', 'DateTime', 'Tz', f'{parameter}', 'qual_code']
+    # print(columns)
+    #
+    # # Read the table, skipping the rows
+    # df = pd.read_table(nwis_url, skiprows=sr+1, names=columns)
+    #
+    # # Export to csv with the title you give
+    # df.to_csv(f"{site_name}"+'.csv')
+    # df['DateTime'] = pd.to_datetime(df['DateTime'])
+    # return df
+
 # Call the function to pull NWIS data
-parameter = '00060'
+parameter = str('00060')
 Shoal_Ck_15min = pull_nwis_data(parameter=parameter, site_number='08156800', start_date='2018-02-01', end_date='2018-02-18', site_name='08156800')
 Shoal_Ck_15min.head()
 
